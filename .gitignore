@@ -1,2 +1,4 @@
 *.pdf
 !compte-rendu/*.pdf
+.venv/
+__pycache__/
