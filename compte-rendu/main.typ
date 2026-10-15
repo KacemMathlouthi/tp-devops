@@ -417,9 +417,22 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
 kubectl -n argocd port-forward svc/argocd-server 8080:443
 ```
 
-L'interface est alors accessible sur #cmd[https://localhost:8080] (certificat auto-signé).
+#shot(
+  "03-argocd-admin-password.png",
+  [Récupération du mot de passe initial de l'utilisateur #cmd[admin] (valeur masquée)],
+)
 
-#todo-shot([Page de connexion / tableau de bord ArgoCD])
+#shot(
+  "04-argocd-port-forward.png",
+  [Port-forward du service #cmd[argocd-server] vers #cmd[localhost:8080]],
+)
+
+L'interface est alors accessible sur #cmd[https://localhost:8080] (certificat auto-signé). Après connexion, ArgoCD (v3.5.5) ne gère encore aucune application.
+
+#shot(
+  "05-argocd-ui-empty.png",
+  [Tableau de bord ArgoCD après la première connexion : aucune application],
+)
 
 == Création de l'Application
 
@@ -450,7 +463,15 @@ spec:
 
 ```bash
 kubectl apply -f argocd/application.yaml
+kubectl -n tp-gitops get pods -w
 ```
+
+C'est la seule commande #cmd[kubectl apply] du TP : à partir de là, ArgoCD crée lui-même le namespace #cmd[tp-gitops] et les ressources décrites dans Git. Les deux pods passent de #cmd[ContainerCreating] à #cmd[Running] puis #cmd[1/1] (readiness probe validée) en moins de 30 secondes.
+
+#shot(
+  "06-app-apply-pods.png",
+  [Création de l'Application puis démarrage des deux pods #cmd[web] déployés par ArgoCD],
+)
 
 #info-box([Options de synchronisation], [
   - #text(weight: 600)[automated] : ArgoCD synchronise dès qu'un nouveau commit est détecté, sans clic sur #emph[Sync].
@@ -459,7 +480,17 @@ kubectl apply -f argocd/application.yaml
   - ArgoCD interroge Git toutes les 3 minutes par défaut ; le bouton #emph[Refresh] force une vérification immédiate.
 ])
 
-#todo-shot([Application #cmd[tp-gitops] : arbre des ressources, statut #emph[Synced] et #emph[Healthy]])
+#figure(
+  image("screenshots/07-argocd-app-tile.png", width: 55%),
+  caption: [Tuile de l'application #cmd[tp-gitops] : dépôt, révision #cmd[main], chemin #cmd[k8s/overlays/dev], statut #emph[Healthy] et #emph[Synced]],
+)
+
+#shot(
+  "08-argocd-app-tree.png",
+  [Arbre des ressources : Service et Deployment #cmd[web], ReplicaSet et deux pods. Synchronisé automatiquement sur le commit #cmd[6ce6324] (#emph[Auto sync is enabled])],
+)
+
+L'en-tête de la vue détaillée illustre déjà la distinction au cœur du TP : #emph[App Health] (état réel des ressources, ici #emph[Healthy]) et #emph[Sync Status] (conformité avec Git, ici #emph[Synced] sur #cmd[main]) sont deux indicateurs indépendants.
 
 ```bash
 kubectl -n tp-gitops port-forward svc/web 8081:80   # http://localhost:8081
