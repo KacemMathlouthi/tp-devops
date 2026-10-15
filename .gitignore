@@ -2,3 +2,4 @@
 !compte-rendu/*.pdf
 .venv/
 __pycache__/
+.playwright-mcp/
