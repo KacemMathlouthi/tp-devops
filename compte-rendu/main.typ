@@ -378,11 +378,18 @@ kubectl kustomize k8s/overlays/dev
 
 == Cluster Kubernetes
 
+Le cluster est un minikube mono-nœud utilisant le driver Docker, sous WSL 2. Deux vCPU et environ 4 Go de RAM suffisent pour Kubernetes, ArgoCD (7 pods) et l'application.
+
 ```bash
-minikube start --driver=docker --cpus=4 --memory=6g
+minikube start --driver=docker --cpus=2 --memory=4g
 kubectl config use-context minikube
 kubectl get nodes
 ```
+
+#shot(
+  "01-minikube-start.png",
+  [Démarrage du cluster minikube (Kubernetes v1.34.0, driver Docker) ; #cmd[kubectl] est configuré sur le contexte #cmd[minikube]],
+)
 
 == Installation d'ArgoCD
 
@@ -395,7 +402,10 @@ kubectl apply -n argocd --server-side \
 kubectl -n argocd rollout status deploy/argocd-server
 ```
 
-#todo-shot([Pods ArgoCD en état #cmd[Running] dans le namespace #cmd[argocd]])
+#shot(
+  "02-argocd-pods.png",
+  [Fin du rollout de #cmd[argocd-server] puis les 7 pods ArgoCD en état #cmd[Running] : application-controller, applicationset-controller, dex, notifications, redis, repo-server et server],
+)
 
 == Accès à l'interface
 
