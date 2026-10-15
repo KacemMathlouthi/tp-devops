@@ -259,7 +259,10 @@ git tag v2 && git push origin v2
   La CI (GitHub Actions) se contente de #emph[produire] une image versionnée ; elle n'a aucun accès au cluster. Le déploiement (CD) est entièrement piloté par ArgoCD, qui #emph[tire] l'état désiré depuis Git : changer la version déployée revient à modifier le tag dans l'overlay Kustomize et à pousser le commit.
 ])
 
-#todo-shot([GitHub Actions : workflow #cmd[build] réussi pour le tag #cmd[v1]])
+#shot(
+  "11-ci-build-v1.png",
+  [GitHub Actions : le push du tag #cmd[v1] déclenche le workflow #cmd[build] (34 s) qui construit et publie l'image],
+)
 
 == Stack technique
 
@@ -367,7 +370,10 @@ Le rendu final peut être vérifié localement sans cluster :
 kubectl kustomize k8s/overlays/dev
 ```
 
-#todo-shot([Dépôt GitHub #cmd[tp-devops] : arborescence #cmd[k8s/] et #cmd[argocd/]])
+#shot(
+  "10-github-repo.png",
+  [Dépôt public #cmd[KacemMathlouthi/tp-devops] : code applicatif, workflow CI, manifests Kustomize, Application ArgoCD et rapport ; le package GHCR #cmd[tp-devops] est lié au dépôt],
+)
 
 #pagebreak()
 
@@ -496,7 +502,10 @@ L'en-tête de la vue détaillée illustre déjà la distinction au cœur du TP :
 kubectl -n tp-gitops port-forward svc/web 8081:80   # http://localhost:8081
 ```
 
-#todo-shot([Page de l'application servie par le cluster (version v1)])
+#figure(
+  image("screenshots/09-app-v1.png", width: 60%),
+  caption: [Application servie par le cluster : version #cmd[v1], réponse du pod #cmd[web-db7b48c65-hf4qp]],
+)
 
 #pagebreak()
 
