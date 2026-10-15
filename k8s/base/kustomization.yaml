@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: web
+      app.kubernetes.io/part-of: tp-gitops
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# Hash-suffixed ConfigMap: editing index.html triggers a rolling update
+configMapGenerator:
+  - name: web-content
+    files:
+      - index.html
