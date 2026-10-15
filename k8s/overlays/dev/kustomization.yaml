@@ -12,5 +12,5 @@ replicas:
     count: 2
 
 images:
-  - name: nginx
-    newTag: 1.27-alpine
+  - name: ghcr.io/kacemmathlouthi/tp-devops
+    newTag: v1

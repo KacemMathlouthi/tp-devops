@@ -9,9 +9,3 @@ labels:
 resources:
   - deployment.yaml
   - service.yaml
-
-# Hash-suffixed ConfigMap: editing index.html triggers a rolling update
-configMapGenerator:
-  - name: web-content
-    files:
-      - index.html
