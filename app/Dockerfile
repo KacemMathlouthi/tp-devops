@@ -14,6 +14,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY main.py .
+COPY templates templates
 
 RUN useradd --uid 10001 --no-create-home app
 USER 10001
