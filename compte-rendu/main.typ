@@ -285,7 +285,28 @@ Le TP doit démontrer cinq concepts :
 
 == Application support
 
-Le sujet laissant le choix de l'application, nous avons retenu un serveur #cmd[nginx] (image officielle #cmd[nginx:alpine]) qui sert une page HTML affichant un numéro de version. La page est injectée via un #cmd[ConfigMap] généré par Kustomize : modifier le fichier #cmd[index.html] dans Git suffit à déclencher un nouveau déploiement, ce qui rend chaque démonstration visible directement dans le navigateur.
+Le sujet laissant le choix de l'application, nous avons retenu une petite API #cmd[FastAPI] (Python 3.12, dépendances gérées par #cmd[uv]) qui expose trois routes :
+
+- #cmd[GET /] : page HTML affichant la version déployée et le nom du pod qui a servi la requête ;
+- #cmd[GET /version] : la même information au format JSON ;
+- #cmd[GET /healthz] : sonde utilisée par Kubernetes (readiness et liveness).
+
+La version affichée est injectée au build de l'image (#cmd[ARG APP_VERSION]) : chaque démonstration est ainsi visible directement dans le navigateur, et le nom du pod permet de constater la répartition de charge entre réplicas.
+
+== Construction de l'image
+
+Le dépôt contient le code applicatif (#cmd[app/]) et une GitHub Action (#cmd[.github/workflows/build.yml]) qui, à chaque tag Git #cmd[v\*], construit l'image et la publie sur GitHub Container Registry :
+
+```bash
+git tag v2 && git push origin v2
+# → ghcr.io/kacemmathlouthi/tp-devops:v2
+```
+
+#info-box([Séparation CI / CD], [
+  La CI (GitHub Actions) se contente de #emph[produire] une image versionnée ; elle n'a aucun accès au cluster. Le déploiement (CD) est entièrement piloté par ArgoCD, qui #emph[tire] l'état désiré depuis Git : changer la version déployée revient à modifier le tag dans l'overlay Kustomize et à pousser le commit.
+])
+
+#todo-shot([GitHub Actions : workflow #cmd[build] réussi pour le tag #cmd[v1]])
 
 == Stack technique
 
@@ -298,25 +319,26 @@ Le sujet laissant le choix de l'application, nous avons retenu un serveur #cmd[n
     [#text(weight: 600)[GitOps]],           [ArgoCD (manifests officiels, namespace #cmd[argocd])],
     [#text(weight: 600)[Manifests]],        [Kustomize : une #cmd[base] et un overlay #cmd[dev]],
     [#text(weight: 600)[Dépôt]],            [GitHub public #cmd[KacemMathlouthi/tp-devops], branche #cmd[main]],
-    [#text(weight: 600)[Application]],      [nginx + page HTML versionnée (ConfigMap)],
+    [#text(weight: 600)[Application]],      [FastAPI (Python 3.12, uv), image Docker non-root],
+    [#text(weight: 600)[CI]],               [GitHub Actions → #cmd[ghcr.io/kacemmathlouthi/tp-devops:<tag>]],
   )
 ]
 
 == Architecture
 
 ```
- Développeur                GitHub (SSOT)                     Cluster minikube
- ───────────                ─────────────                     ────────────────
- git commit  ──push──▶  KacemMathlouthi/tp-devops   ◀──pull──  argocd (namespace)
-                         └── k8s/overlays/dev                  ├── repo-server   : rend Kustomize
-                                                               ├── app-controller: compare & sync
-                                                               └── server (UI)   : https://localhost:8080
-                                                                        │ apply
-                                                                        ▼
-                                                               tp-gitops (namespace)
-                                                               ├── Deployment web (nginx)
-                                                               ├── Service web
-                                                               └── ConfigMap web-content-<hash>
+ Développeur          GitHub (SSOT)                    Cluster minikube
+ ───────────          ─────────────                    ────────────────
+ git push ────────▶  tp-devops (main)       ◀──pull──  argocd
+ git tag vX           ├── app/                          ├── repo-server    : rend Kustomize
+                      └── k8s/overlays/dev              ├── app-controller : compare & sync
+                             │                          └── server (UI)    : localhost:8080
+                             ▼ tag vX                            │ apply
+                      GitHub Actions                             ▼
+                             │ docker push              tp-gitops
+                             ▼                          ├── Deployment web
+                      ghcr.io/.../tp-devops:vX ◀─pull── ├── Pods (FastAPI)
+                                                        └── Service web
 ```
 
 #pagebreak()
@@ -328,16 +350,20 @@ Le sujet laissant le choix de l'application, nous avons retenu un serveur #cmd[n
 
 == Organisation
 
-Un seul dépôt contient l'ensemble du TP. ArgoCD ne lit que le chemin #cmd[k8s/overlays/dev] ; le reste du dépôt (rapport, définition de l'Application) ne perturbe donc pas la synchronisation.
+Un seul dépôt contient l'ensemble du TP : code applicatif, pipeline de build et manifests. ArgoCD ne lit que le chemin #cmd[k8s/overlays/dev] ; le reste du dépôt (code, rapport, définition de l'Application) ne perturbe donc pas la synchronisation.
 
 ```
 tp-devops/
+├── app/                          # code applicatif
+│   ├── main.py                   # API FastAPI
+│   ├── pyproject.toml, uv.lock   # dépendances (uv)
+│   └── Dockerfile
+├── .github/workflows/build.yml   # build + push de l'image sur tag vX
 ├── k8s/
 │   ├── base/                     # ressources communes
 │   │   ├── kustomization.yaml
 │   │   ├── deployment.yaml
-│   │   ├── service.yaml
-│   │   └── index.html            # contenu servi par nginx
+│   │   └── service.yaml
 │   └── overlays/
 │       └── dev/
 │           └── kustomization.yaml  # namespace, replicas, tag d'image
@@ -348,20 +374,27 @@ tp-devops/
 
 == Base Kustomize
 
-La base déclare le #cmd[Deployment], le #cmd[Service] et génère le #cmd[ConfigMap] à partir de #cmd[index.html]. Le suffixe de hash ajouté par le #cmd[configMapGenerator] change à chaque modification du fichier, ce qui force un rolling update des pods.
+La base décrit l'application indépendamment de tout environnement : un #cmd[Deployment] et un #cmd[Service], auxquels Kustomize ajoute des labels communs.
 
 ```yaml
 # k8s/base/kustomization.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/name: web
+      app.kubernetes.io/part-of: tp-gitops
 resources:
   - deployment.yaml
   - service.yaml
-configMapGenerator:
-  - name: web-content
-    files:
-      - index.html
 ```
 
-Dans le #cmd[Deployment], #cmd[progressDeadlineSeconds] est réduit à 60 s : en cas d'image introuvable, Kubernetes marque le rollout en échec au bout d'une minute (au lieu de 10 par défaut) et ArgoCD affiche alors #emph[Degraded].
+Points notables du #cmd[Deployment] :
+
+- sondes #cmd[readinessProbe] et #cmd[livenessProbe] sur #cmd[/healthz] : c'est sur elles que repose le #emph[Health Status] calculé par ArgoCD ;
+- variable #cmd[POD_NAME] injectée via l'API downward, affichée par l'application ;
+- requests/limits CPU et mémoire ;
+- #cmd[progressDeadlineSeconds: 60] : en cas d'image introuvable, Kubernetes marque le rollout en échec au bout d'une minute (au lieu de 10 par défaut) et ArgoCD affiche alors #emph[Degraded].
+
+Le #cmd[Service] (#cmd[ClusterIP], port 80 → 8000) répartit le trafic entre les pods portant le label #cmd[app: web].
 
 == Overlay #cmd[dev]
 
@@ -376,8 +409,8 @@ replicas:
   - name: web
     count: 2
 images:
-  - name: nginx
-    newTag: 1.27-alpine
+  - name: ghcr.io/kacemmathlouthi/tp-devops
+    newTag: v1
 ```
 
 Le rendu final peut être vérifié localement sans cluster :
@@ -470,7 +503,11 @@ kubectl apply -f argocd/application.yaml
 
 #todo-shot([Application #cmd[tp-gitops] : arbre des ressources, statut #emph[Synced] et #emph[Healthy]])
 
-#todo-shot([Page nginx servie par le cluster (version v1)])
+```bash
+kubectl -n tp-gitops port-forward svc/web 8081:80   # http://localhost:8081
+```
+
+#todo-shot([Page de l'application servie par le cluster (version v1)])
 
 #pagebreak()
 
