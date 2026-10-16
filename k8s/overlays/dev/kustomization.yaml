@@ -12,4 +12,4 @@ replicas:
 
 images:
   - name: ghcr.io/kacemmathlouthi/tp-devops
-    newTag: v2
+    newTag: doesnotexist
