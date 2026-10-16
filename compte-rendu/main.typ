@@ -561,7 +561,10 @@ Le rolling update respecte les valeurs par défaut du Deployment (#cmd[maxSurge:
   [Fin du rollout : #emph[Healthy] et #emph[Synced]. Les deux pods appartiennent au ReplicaSet v2 ; l'ancien ReplicaSet #cmd[web-db7b48c65] (#cmd[rev:1]) est conservé à 0 réplica comme historique Kubernetes (#cmd[revisionHistoryLimit])],
 )
 
-#todo-shot([Page de l'application en version v2])
+#shot(
+  "15-demo1-app-v2.png",
+  [Résultat visible côté utilisateur : la page affiche désormais la version #cmd[v2] (nouvelle interface), servie par le pod #cmd[web-9b677f46d-7jw27] du nouveau ReplicaSet],
+)
 
 #success-box([
   Un simple commit dans Git a suffi à déployer la version v2 : ArgoCD a détecté l'écart entre l'état désiré et l'état réel, puis a appliqué le changement sans aucune intervention sur le cluster. Le statut de santé est passé de #emph[Progressing] à #emph[Healthy] à la fin du rolling update, sans interruption de service.
@@ -576,13 +579,57 @@ Le rolling update respecte les valeurs par défaut du Deployment (#cmd[maxSurge:
 
 Objectif : altérer manuellement le cluster et montrer qu'ArgoCD rétablit l'état décrit dans Git.
 
-#todo-shot([Suppression manuelle du Deployment avec #cmd[kubectl delete]])
+== Suppression du Deployment
 
-#todo-shot([ArgoCD : drift détecté (#emph[OutOfSync]) puis réconciliation])
+On simule une erreur humaine (ou une action non autorisée) en supprimant directement le Deployment depuis le terminal, sans passer par Git :
 
-#todo-shot([Le Deployment est recréé automatiquement])
+```bash
+kubectl -n tp-gitops delete deployment web
+```
 
-#success-box([À compléter après la démonstration.])
+#shot(
+  "16-demo2-delete.png",
+  [Suppression manuelle du Deployment #cmd[web] : les deux pods v2 sont supprimés en cascade],
+)
+
+L'état réel du cluster ne correspond plus à Git : la ressource #cmd[Deployment/web] déclarée dans l'overlay est absente. L'application-controller d'ArgoCD surveille en permanence les ressources qu'il gère (via des #emph[watches] sur l'API Kubernetes) ; il détecte immédiatement l'écart et, comme #cmd[selfHeal: true] est activé, relance une synchronisation sans attendre le prochain polling de Git.
+
+== Réconciliation automatique
+
+#shot(
+  "17-demo2-argocd-recreating.png",
+  [Quelques secondes après la suppression : ArgoCD a déjà recréé le Deployment (#cmd[a few seconds], #cmd[rev:1]) et son ReplicaSet ; les nouveaux pods démarrent (#cmd[0/1]), l'application est #emph[Progressing]],
+)
+
+#shot(
+  "18-demo2-argocd-healed.png",
+  [Environ 15 secondes après la suppression : application de nouveau #emph[Healthy] et #emph[Synced]. Le Service, qui n'a pas été touché, garde son âge (40 minutes) ; seuls le Deployment, le ReplicaSet et les pods sont neufs],
+)
+
+Deux détails confirment que la ressource a bien été recréée et non simplement conservée :
+
+- le Deployment repart en révision #cmd[rev:1] : son historique Kubernetes (dont l'ancien ReplicaSet v1) a disparu avec lui ;
+- les pods ont de nouveaux noms (#cmd[web-9b677f46d-82cw5], #cmd[web-9b677f46d-tzdr2]) mais le même hash de template, car ils sont reconstruits à partir du même manifeste Git (image v2).
+
+== Drift sur un champ : nombre de réplicas
+
+Le drift n'est pas forcément une suppression : une simple modification d'un champ est aussi détectée. On augmente manuellement le nombre de réplicas alors que Git en déclare deux :
+
+#shot(
+  "19-demo2-scale.png",
+  [Passage manuel du Deployment à 5 réplicas avec #cmd[kubectl scale]],
+)
+
+#shot(
+  "20-demo2-argocd-scale-reverted.png",
+  [Quelques secondes plus tard : ArgoCD a rétabli #cmd[replicas: 2]. Les pods créés par le scale manuel (#cmd[btccd], #cmd[xr9mz]) sont déjà en #cmd[terminating] (#cmd[0/1]) ; seuls les deux pods conformes à Git restent #cmd[running]],
+)
+
+La correction est si rapide que l'application ne passe même pas visiblement par l'état #emph[OutOfSync] : #emph[Last Sync] indique simplement une nouvelle synchronisation automatique réussie quelques secondes après la modification.
+
+#success-box([
+  Toute modification faite hors de Git est considérée comme un drift et annulée : le Deployment supprimé a été recréé en quelques secondes, sans intervention humaine. Git reste l'unique source de vérité ; pour modifier durablement le cluster, il faut passer par un commit.
+])
 
 #pagebreak()
 
