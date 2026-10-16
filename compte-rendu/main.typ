@@ -531,13 +531,41 @@ git tag v2 && git push origin v2
 
 == Modification de l'état désiré dans Git
 
-#todo-shot([Commit modifiant le nombre de réplicas et la version])
+Le déploiement de la nouvelle version se résume à changer une ligne dans l'overlay, puis à pousser le commit. Aucune commande n'est envoyée au cluster.
 
-#todo-shot([ArgoCD détecte le nouveau commit et synchronise automatiquement])
+```diff
+# k8s/overlays/dev/kustomization.yaml
+ images:
+   - name: ghcr.io/kacemmathlouthi/tp-devops
+-    newTag: v1
++    newTag: v2
+```
 
-#todo-shot([Terminal : nouveaux pods créés par ArgoCD])
+```bash
+git commit -am "feat(k8s): deploy v2" && git push
+```
 
-#success-box([À compléter après la démonstration.])
+== Synchronisation automatique par ArgoCD
+
+ArgoCD interroge le dépôt périodiquement (toutes les 3 minutes par défaut) ; le bouton #emph[Refresh] force une vérification immédiate sans déclencher de synchronisation manuelle. Dès que le nouveau commit est détecté, la politique #cmd[automated] applique le Deployment modifié et Kubernetes effectue un rolling update.
+
+#shot(
+  "13-demo1-argocd-progressing.png",
+  [Pendant la synchronisation : l'application est #emph[Synced] sur le nouveau commit mais #emph[Progressing]. Un nouveau ReplicaSet #cmd[web-9b677f46d] (#cmd[rev:2], image v2) démarre son premier pod (#cmd[ContainerCreating]) tandis que les deux pods v1 continuent de servir le trafic],
+)
+
+Le rolling update respecte les valeurs par défaut du Deployment (#cmd[maxSurge: 25%], #cmd[maxUnavailable: 25%]) : un pod v2 est créé, et ce n'est qu'une fois sa readiness probe validée qu'un pod v1 est supprimé. La capacité ne descend jamais sous deux pods prêts.
+
+#shot(
+  "14-demo1-argocd-healthy.png",
+  [Fin du rollout : #emph[Healthy] et #emph[Synced]. Les deux pods appartiennent au ReplicaSet v2 ; l'ancien ReplicaSet #cmd[web-db7b48c65] (#cmd[rev:1]) est conservé à 0 réplica comme historique Kubernetes (#cmd[revisionHistoryLimit])],
+)
+
+#todo-shot([Page de l'application en version v2])
+
+#success-box([
+  Un simple commit dans Git a suffi à déployer la version v2 : ArgoCD a détecté l'écart entre l'état désiré et l'état réel, puis a appliqué le changement sans aucune intervention sur le cluster. Le statut de santé est passé de #emph[Progressing] à #emph[Healthy] à la fin du rolling update, sans interruption de service.
+])
 
 #pagebreak()
 
