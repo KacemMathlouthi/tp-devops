@@ -16,7 +16,7 @@
 
 // ── Code ────────────────────────────────────
 #show raw.where(block: true): it => block(
-  width: 100%, radius: 6pt, fill: surface-2, inset: 14pt,
+  width: 100%, radius: 6pt, fill: surface-2, inset: 14pt, breakable: false,
   stroke: 0.5pt + border,
 )[
   #set text(fill: ink, font: geist-mono, size: 7.5pt)
@@ -121,6 +121,12 @@
 #let shot(name, caption) = figure(
   box(stroke: 0.5pt + border, radius: 4pt, clip: true,
     image("screenshots/" + name, width: 100%)),
+  caption: caption,
+)
+
+#let shot-w(name, w, caption) = figure(
+  box(stroke: 0.5pt + border, radius: 4pt, clip: true,
+    image("screenshots/" + name, width: w)),
   caption: caption,
 )
 
@@ -262,8 +268,7 @@
 git tag v2 && git push origin v2   # → ghcr.io/kacemmathlouthi/tp-devops:v2
 ```
 
-#shot(
-  "11-ci-build-v1.png",
+#shot-w("11-ci-build-v1.png", 75%,
   [Le push du tag #cmd[v1] déclenche le workflow #cmd[build] (34 s)],
 )
 
@@ -294,8 +299,6 @@ git tag v2 && git push origin v2   # → ghcr.io/kacemmathlouthi/tp-devops:v2
                       ghcr.io/.../tp-devops:vX ◀─pull── ├── Pods (FastAPI)
                                                         └── Service web
 ```
-
-#pagebreak()
 
 // ═══════════════════════════════════════════
 //  ÉTAPE 1, DÉPÔT
@@ -361,8 +364,6 @@ images:
   "10-github-repo.png",
   [Dépôt public #cmd[KacemMathlouthi/tp-devops], avec le package GHCR lié],
 )
-
-#pagebreak()
 
 // ═══════════════════════════════════════════
 //  ÉTAPE 2, ARGOCD
@@ -462,11 +463,6 @@ kubectl apply -f argocd/application.yaml
   [Création de l'Application : les deux pods passent #cmd[Running 1/1] en moins de 30 s],
 )
 
-#figure(
-  image("screenshots/07-argocd-app-tile.png", width: 55%),
-  caption: [Application #cmd[tp-gitops] : #emph[Healthy] et #emph[Synced]],
-)
-
 #shot(
   "08-argocd-app-tree.png",
   [Arbre des ressources : Service, Deployment, ReplicaSet, 2 pods],
@@ -478,9 +474,18 @@ kubectl apply -f argocd/application.yaml
 kubectl -n tp-gitops port-forward svc/web 8081:80
 ```
 
-#figure(
-  image("screenshots/09-app-v1.png", width: 60%),
-  caption: [Application servie par le cluster : version #cmd[v1]],
+#grid(
+  columns: (1fr, 1fr),
+  column-gutter: 16pt,
+  align: horizon,
+  figure(
+    image("screenshots/07-argocd-app-tile.png", width: 100%),
+    caption: [#cmd[tp-gitops] : #emph[Healthy] et #emph[Synced]],
+  ),
+  figure(
+    image("screenshots/09-app-v1.png", width: 100%),
+    caption: [Application servie : version #cmd[v1]],
+  ),
 )
 
 
@@ -598,8 +603,7 @@ kubectl -n tp-gitops scale deploy web --replicas=5
   [ArgoCD rétablit #cmd[replicas: 2] : les pods en trop sont déjà en #cmd[terminating]],
 )
 
-#shot(
-  "21-demo2-pods-watch.png",
+#shot-w("21-demo2-pods-watch.png", 40%,
   [Les 3 pods supplémentaires passent en #cmd[Terminating] dès leur création],
 )
 
@@ -657,8 +661,7 @@ git commit -am "feat(k8s): deploy nonexistent image" && git push
   [Événements du pod : #cmd[manifest unknown], puis #cmd[ErrImagePull] / #cmd[ImagePullBackOff]],
 )
 
-#shot(
-  "25-demo3-pods-watch.png",
+#shot-w("25-demo3-pods-watch.png", 70%,
   [Nouvelles tentatives à intervalles croissants ; les deux pods v2 restent #cmd[Running]],
 )
 
@@ -705,7 +708,7 @@ git commit -am "feat(k8s): deploy nonexistent image" && git push
 - La v2 apparaît sous un message #cmd[docs(cr)] : ArgoCD enregistre la tête de branche au moment de la synchronisation.
 
 #figure(
-  image("screenshots/28-demo4-history.png", width: 75%),
+  image("screenshots/28-demo4-history.png", width: 60%),
   caption: [#cmd[8a2a887] (cassée), #cmd[51974a2] (v2), #cmd[6ce6324] (v1)],
 )
 
@@ -738,7 +741,7 @@ git push
 )
 
 #figure(
-  image("screenshots/32-demo4-history-after-rollback.png", width: 75%),
+  image("screenshots/32-demo4-history-after-rollback.png", width: 60%),
   caption: [Le rollback apparaît dans l'historique, initié par #cmd[admin]],
 )
 
@@ -756,7 +759,7 @@ git push
   ),
 )
 
-#table(
+#block(breakable: false, table(
   columns: (auto, 1fr, 1fr),
   stroke: (x, y) => (top: 0.5pt + border, bottom: 0.5pt + border),
   inset: (x: 8pt, y: 7pt),
@@ -766,14 +769,12 @@ git push
   [Traçabilité], [historique ArgoCD], [historique Git, relisible],
   [Auto-sync], [doit être désactivé], [reste actif],
   [Usage], [urgence], [correction pérenne],
-)
+))
 
 #success-box([
   - Retour à la dernière version saine en un clic, #emph[Healthy] en quelques secondes.
   - #cmd[git revert] puis réactivation de l'auto-sync : Git redevient la seule source de vérité.
 ])
-
-#pagebreak()
 
 // ═══════════════════════════════════════════
 //  CONCLUSION
