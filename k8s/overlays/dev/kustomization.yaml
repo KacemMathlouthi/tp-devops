@@ -6,11 +6,10 @@ namespace: tp-gitops
 resources:
   - ../../base
 
-# Demo knobs: change these, commit, push — ArgoCD does the rest
 replicas:
   - name: web
     count: 2
 
 images:
   - name: ghcr.io/kacemmathlouthi/tp-devops
-    newTag: v1
+    newTag: v2
