@@ -649,13 +649,62 @@ La correction est si rapide que l'application ne passe même pas visiblement par
 
 Objectif : montrer qu'une application peut être parfaitement synchronisée avec Git tout en étant défaillante.
 
-#todo-shot([Commit introduisant un tag d'image inexistant])
+== Rappel : deux indicateurs indépendants
 
-#todo-shot([ArgoCD : application #emph[Synced] mais #emph[Degraded]])
+#deflist(
+  [Sync Status], [compare l'état #emph[déclaré] dans Git à l'état #emph[déclaré] dans le cluster (les manifests). Valeurs : #emph[Synced], #emph[OutOfSync].],
+  [Health Status], [évalue l'état #emph[opérationnel] des ressources (pods prêts, rollout terminé…). Valeurs : #emph[Healthy], #emph[Progressing], #emph[Degraded], #emph[Missing]…],
+)
 
-#todo-shot([Pod en #cmd[ErrImagePull] / #cmd[ImagePullBackOff]])
+Un manifeste peut donc être appliqué à la lettre tout en décrivant quelque chose qui ne fonctionne pas.
 
-#success-box([À compléter après la démonstration.])
+== Introduction d'une erreur dans Git
+
+On référence une image qui n'existe pas dans le registre :
+
+```diff
+# k8s/overlays/dev/kustomization.yaml
+ images:
+   - name: ghcr.io/kacemmathlouthi/tp-devops
+-    newTag: v2
++    newTag: doesnotexist
+```
+
+```bash
+git commit -am "feat(k8s): deploy nonexistent image" && git push
+```
+
+== Synced mais Progressing, puis Degraded
+
+#shot(
+  "22-demo3-argocd-progressing.png",
+  [Quelques secondes après la synchronisation : #emph[Synced] sur le commit #cmd[8a2a887] mais #emph[Progressing]. Le nouveau ReplicaSet #cmd[web-598b77b57] (#cmd[rev:2]) tente de démarrer un pod qui échoue en #cmd[errimagepull] ; les deux pods v2 restent #cmd[running]],
+)
+
+#shot(
+  "23-demo3-argocd-degraded.png",
+  [Après l'expiration de #cmd[progressDeadlineSeconds] (60 s) : l'application est toujours #emph[Synced] mais passe en #emph[Degraded]. Le pod en échec est en #cmd[imagepullbackoff], le Deployment porte un cœur rouge],
+)
+
+Le passage de #emph[Progressing] à #emph[Degraded] vient de Kubernetes, pas d'ArgoCD : au bout de 60 s sans progression, le contrôleur de Deployment pose la condition #cmd[Progressing=False] (raison #cmd[ProgressDeadlineExceeded]), qu'ArgoCD traduit en #emph[Degraded].
+
+#shot(
+  "24-demo3-pod-events.png",
+  [Événements du pod en échec dans ArgoCD : #cmd[Failed to pull image "ghcr.io/kacemmathlouthi/tp-devops:doesnotexist": manifest unknown], puis #cmd[ErrImagePull] et #cmd[ImagePullBackOff] (Kubernetes réessaie avec un délai croissant)],
+)
+
+#shot(
+  "25-demo3-pods-watch.png",
+  [#cmd[kubectl get pods -w] : le nouveau pod alterne entre #cmd[ErrImagePull] et #cmd[ImagePullBackOff] avec des délais croissants (2 s, 18 s, 47 s, 77 s…), tandis que les deux pods v2 restent #cmd[Running 1/1]],
+)
+
+#info-box([Pas d'interruption de service], [
+  Le rolling update ne supprime un ancien pod qu'une fois le nouveau prêt. Le pod #cmd[doesnotexist] ne devenant jamais prêt, les deux pods v2 de l'ancien ReplicaSet continuent de servir le trafic : le déploiement est bloqué, mais l'application reste disponible.
+])
+
+#success-box([
+  L'application est #emph[Synced] : ArgoCD a correctement appliqué ce que Git décrit. Elle est pourtant #emph[Degraded], car ce que Git décrit est faux. La synchronisation garantit la conformité à la source de vérité, pas le bon fonctionnement ; c'est le Health Status qui révèle l'erreur applicative. Pour corriger, il faut revenir à un état stable, ce qui fait l'objet de la démonstration suivante.
+])
 
 #pagebreak()
 
