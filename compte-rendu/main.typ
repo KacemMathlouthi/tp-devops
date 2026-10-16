@@ -715,13 +715,99 @@ Le passage de #emph[Progressing] à #emph[Degraded] vient de Kubernetes, pas d'A
 
 Objectif : revenir instantanément à une version stable depuis l'onglet #emph[History and Rollback].
 
-#todo-shot([Onglet #emph[History and Rollback] listant les révisions déployées])
+On part de l'état laissé par la démonstration 3 : l'application est #emph[Synced] mais #emph[Degraded] sur le commit #cmd[8a2a887] (image #cmd[doesnotexist]).
 
-#todo-shot([Rollback vers la dernière révision stable])
+== Désactivation de l'auto-sync
 
-#todo-shot([Application de nouveau #emph[Healthy] après rollback])
+ArgoCD refuse un rollback tant que la synchronisation automatique est active : sans cela, la politique #cmd[automated] réappliquerait immédiatement la révision de Git, c'est-à-dire la version cassée. On la désactive depuis #emph[Details → Sync Policy].
 
-#success-box([À compléter après la démonstration.])
+#figure(
+  image("screenshots/26-demo4-disable-autosync.png", width: 85%),
+  caption: [Confirmation de la désactivation de la synchronisation automatique],
+)
+
+#figure(
+  image("screenshots/27-demo4-autosync-disabled.png", width: 45%),
+  caption: [Sync Policy passée à #emph[None] : #emph[Prune] et #emph[Self Heal] restent cochés mais n'ont plus d'effet sans auto-sync],
+)
+
+== Historique des déploiements
+
+L'onglet #emph[History and Rollback] liste chaque synchronisation effectuée : révision Git, auteur, message de commit, date, durée et origine (#emph[automated sync policy] ou utilisateur). L'Application conserve les 10 dernières entrées (#cmd[revisionHistoryLimit: 10]).
+
+#figure(
+  image("screenshots/28-demo4-history.png", width: 75%),
+  caption: [Historique avant rollback : #cmd[8a2a887] (image inexistante, active), #cmd[51974a2] (version v2) et #cmd[6ce6324] (version v1)],
+)
+
+#warn-box([
+  La révision v2 apparaît sous le message #cmd[docs(cr): add v2 build screenshot] et non #cmd[feat(k8s): deploy v2] : les deux commits ont été poussés ensemble, et ArgoCD enregistre la tête de la branche au moment de la synchronisation. Le contenu déployé est bien celui de l'overlay avec #cmd[newTag: v2].
+])
+
+== Rollback
+
+Depuis le menu de la révision #cmd[51974a2], on choisit #emph[Rollback] :
+
+#figure(
+  image("screenshots/29-demo4-rollback-dialog.png", width: 85%),
+  caption: [Confirmation du rollback de l'application #cmd[tp-gitops] vers la révision #cmd[51974a2]],
+)
+
+#shot(
+  "30-demo4-healthy-outofsync.png",
+  [Quelques secondes après le rollback : #emph[Healthy] (Last Sync vers #cmd[51974a2]) mais #emph[OutOfSync] par rapport à #cmd[main], qui référence toujours l'image cassée],
+)
+
+Le rollback est quasi instantané et ne crée même aucun pod : Kubernetes retrouve l'ancien ReplicaSet v2 (#cmd[web-9b677f46d]), dont les pods n'avaient jamais été arrêtés, et le promeut en révision #cmd[rev:3] ; le ReplicaSet défaillant est ramené à zéro.
+
+L'état #emph[OutOfSync] est le résultat attendu : le cluster ne correspond plus à Git. Le rollback depuis l'interface est une mesure d'urgence qui court-circuite temporairement la source de vérité.
+
+== Retour à Git comme source de vérité
+
+Pour clore l'incident, l'erreur est annulée dans Git par un #cmd[git revert], qui conserve la trace de l'erreur et de sa correction dans l'historique :
+
+```bash
+git revert 8a2a887       # newTag: doesnotexist → v2
+git push
+```
+
+#shot(
+  "31-demo4-synced-after-revert.png",
+  [Après le revert : #emph[Synced] sur #cmd[ff5e36a] et #emph[Healthy], alors que l'auto-sync est encore désactivé. Git décrit à nouveau exactement ce qui tourne, aucune synchronisation n'est nécessaire],
+)
+
+#figure(
+  image("screenshots/32-demo4-history-after-rollback.png", width: 75%),
+  caption: [Le rollback apparaît dans l'historique comme un nouveau déploiement de #cmd[51974a2], initié par #cmd[admin] et non par la politique automatique],
+)
+
+L'auto-sync est enfin réactivé : l'application retrouve son mode de fonctionnement GitOps nominal.
+
+#figure(
+  image("screenshots/33-demo4-autosync-reenabled.png", width: 45%),
+  caption: [Sync Policy de nouveau #emph[Automated], avec #emph[Prune] et #emph[Self Heal]],
+)
+
+#figure(
+  image("screenshots/34-demo4-final-synced.png", width: 70%),
+  caption: [État final : #emph[Synced] sur le commit de revert #cmd[ff5e36a], #emph[Auto sync is enabled]],
+)
+
+#table(
+  columns: (auto, 1fr, 1fr),
+  stroke: (x, y) => (top: 0.5pt + border, bottom: 0.5pt + border),
+  inset: (x: 8pt, y: 7pt),
+  align: left + top,
+  table.header([], text(weight: 500)[Rollback ArgoCD (UI)], text(weight: 500)[#cmd[git revert] + push]),
+  [Délai], [immédiat], [détection du commit (polling ou Refresh)],
+  [Traçabilité], [historique ArgoCD uniquement], [historique Git, relisible et revu],
+  [Auto-sync], [doit être désactivé], [reste actif],
+  [Usage], [mesure d'urgence], [correction pérenne],
+)
+
+#success-box([
+  L'historique ArgoCD a permis d'identifier la dernière version saine et d'y revenir en un clic : l'application est redevenue #emph[Healthy] en quelques secondes. Le #cmd[git revert] a ensuite réaligné Git sur le cluster, puis l'auto-sync a été réactivé. L'état final est #emph[Synced] et #emph[Healthy], avec Git de nouveau seule source de vérité.
+])
 
 #pagebreak()
 
@@ -730,7 +816,22 @@ Objectif : revenir instantanément à une version stable depuis l'onglet #emph[H
 // ═══════════════════════════════════════════
 = Conclusion
 
-À compléter.
+Ce TP a mis en place une chaîne de déploiement continu entièrement pilotée par Git. Le code applicatif, la construction de l'image, les manifests Kubernetes et la définition de l'Application ArgoCD sont versionnés dans un même dépôt ; seule l'Application a été appliquée à la main, une fois.
+
+#deflist(
+  [Single Source of Truth], [l'état désiré complet (Deployment, Service, namespace, version, réplicas) est décrit dans l'overlay Kustomize ; aucune ressource applicative n'a été créée avec #cmd[kubectl apply].],
+  [Pull-based CD], [la CI ne fait que publier des images ; c'est ArgoCD, dans le cluster, qui tire les changements de Git. Démo 1 : un commit d'une ligne a déployé la v2 par rolling update, sans interruption.],
+  [Drift & Self-Healing], [démo 2 : un Deployment supprimé a été recréé en quelques secondes, un scale manuel annulé aussitôt.],
+  [Sync vs Health], [démo 3 : une image inexistante donne une application #emph[Synced] mais #emph[Degraded] ; la synchronisation garantit la conformité à Git, pas le bon fonctionnement.],
+  [Rollback & Historique], [démo 4 : retour en un clic à la dernière révision saine, puis #cmd[git revert] pour que Git redevienne la référence.],
+)
+
+Ces démonstrations font aussi ressortir les limites et les points d'attention de l'approche :
+
+- la détection repose sur le polling de Git (3 minutes par défaut) ; en production, un webhook GitHub vers ArgoCD rendrait la détection quasi immédiate ;
+- le rollback depuis l'interface entre en tension avec le principe GitOps : il impose de suspendre l'auto-sync et doit toujours être suivi d'une correction dans Git ;
+- ArgoCD ne valide pas ce qu'il déploie : une erreur dans Git est appliquée fidèlement. Des garde-fous en amont (revue de code, vérification de l'existence de l'image en CI) ou des stratégies progressives (Argo Rollouts, canary) complètent utilement le dispositif ;
+- la structure base/overlay rend l'ajout d'un environnement (par exemple #cmd[overlays/prod] et une seconde Application) peu coûteux, la promotion d'une version se résumant alors à un changement de tag dans un autre overlay.
 
 #info-box([Dépôt], [
   - GitHub : #link("https://github.com/KacemMathlouthi/tp-devops")[github.com/KacemMathlouthi/tp-devops]
