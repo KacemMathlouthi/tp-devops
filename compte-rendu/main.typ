@@ -12,6 +12,7 @@
 // ── Font family ─────────────────────────────
 #let geist = "Geist"
 #let geist-mono = "Geist Mono"
+#let display = "Playfair Display"
 
 // ── Code ────────────────────────────────────
 #show raw.where(block: true): it => block(
@@ -33,7 +34,7 @@
 #show heading.where(level: 1): it => {
   v(8pt)
   block(width: 100%, below: 18pt)[
-    #set text(font: geist, size: 22pt, weight: 600, fill: ink, tracking: -0.9pt)
+    #set text(font: display, size: 26pt, weight: 600, fill: ink)
     #set par(justify: false)
     #it.body
   ]
@@ -42,7 +43,7 @@
 #show heading.where(level: 2): it => {
   v(14pt)
   block(width: 100%, below: 8pt)[
-    #set text(font: geist, size: 13pt, weight: 600, fill: ink, tracking: -0.35pt)
+    #set text(font: display, size: 15pt, weight: 600, fill: ink)
     #it.body
   ]
 }
@@ -65,8 +66,15 @@
 #set figure.caption(separator: [. ])
 #show figure.caption: set align(left)
 
+// ── Demo divider: a page with only the demo name ──
+#let demo-page(n) = page(header: none, footer: none)[
+  #align(center + horizon)[
+    #text(font: display, size: 64pt, weight: 500, fill: ink)[Démo #n]
+  ]
+]
+
 // ── Lists ───────────────────────────────────
-#set list(marker: text(fill: ink-3)[–], indent: 2pt, body-indent: 8pt)
+#set list(marker: text(fill: ink-3)[–], indent: 2pt, body-indent: 8pt, spacing: 0.75em)
 #set enum(numbering: n => text(fill: ink-3, font: geist-mono, size: 8.5pt)[#str(n)], indent: 2pt, body-indent: 8pt)
 
 // ── Links ───────────────────────────────────
@@ -74,7 +82,7 @@
 
 // ── Notes: one neutral surface, colour only for state ──
 #let note-block(label, body, dot: none) = block(
-  width: 100%, radius: 6pt,
+  width: 100%, radius: 6pt, breakable: false,
   fill: surface-2,
   stroke: 0.5pt + border,
   inset: (x: 14pt, y: 12pt),
@@ -172,8 +180,8 @@
 
   #text(size: 10pt, fill: ink-2)[Travaux pratiques, TP1]
   #v(10pt)
-  #block(width: 88%)[
-    #text(size: 38pt, weight: 600, fill: ink, tracking: -1.8pt)[Continuous Deployment avec GitOps et ArgoCD]
+  #block(width: 90%)[
+    #text(font: display, size: 40pt, weight: 600, fill: ink)[Continuous Deployment avec GitOps et ArgoCD]
   ]
   #v(14pt)
   #block(width: 72%)[
@@ -210,7 +218,7 @@
   text(weight: 500, it)
 }
 #outline(
-  title: text(font: geist, size: 22pt, weight: 600, fill: ink, tracking: -0.9pt)[Table des matières],
+  title: text(font: display, size: 26pt, weight: 600, fill: ink)[Table des matières],
   indent: 1.2em,
   depth: 2,
 )
@@ -218,61 +226,56 @@
 
 
 // ═══════════════════════════════════════════
-//  1. PRÉSENTATION
+//  PRÉSENTATION
 // ═══════════════════════════════════════════
 = Présentation générale
 
 == Objectif
 
-Ce TP met en place un pipeline GitOps de bout en bout : l'état désiré de l'application et de ses ressources Kubernetes est décrit de façon déclarative dans un dépôt Git, et ArgoCD, installé dans le cluster, se charge de le faire converger vers cet état. Aucun #cmd[kubectl apply] n'est lancé depuis l'extérieur pour déployer : le cluster #emph[tire] (pull) sa configuration depuis Git.
-
-Le TP doit démontrer cinq concepts :
+- Décrire l'application et son infrastructure Kubernetes de façon déclarative dans Git.
+- Laisser ArgoCD, installé dans le cluster, appliquer cet état : le cluster #emph[tire] sa configuration, aucun #cmd[kubectl apply] externe.
+- Démontrer cinq concepts :
 
 #deflist(
-  [Single Source of Truth], [Tout l'état désiré vit dans Git : manifests Kustomize et définition de l'Application ArgoCD.],
-  [Pull-based CD],          [ArgoCD surveille le dépôt et applique automatiquement chaque commit.],
-  [Drift et self-healing],  [Toute modification manuelle du cluster est détectée puis annulée.],
-  [Sync et Health],         [Un manifeste conforme à Git (#emph[Synced]) peut produire des pods en échec (#emph[Degraded]).],
-  [Rollback et historique], [Retour instantané à une révision stable depuis l'onglet #emph[History and Rollback].],
+  [Single Source of Truth], [tout l'état désiré vit dans Git],
+  [Pull-based CD],          [chaque commit est appliqué automatiquement par ArgoCD],
+  [Drift et self-healing],  [toute modification manuelle du cluster est annulée],
+  [Sync et Health],         [conforme à Git (#emph[Synced]) ne veut pas dire fonctionnel (#emph[Healthy])],
+  [Rollback et historique], [retour instantané à une révision stable],
 )
 
-== Application support
+== Application
 
-Le sujet laissant le choix de l'application, nous avons retenu une petite API #cmd[FastAPI] (Python 3.12, dépendances gérées par #cmd[uv]) qui expose trois routes :
-
-- #cmd[GET /] : page HTML affichant la version déployée et le nom du pod qui a servi la requête ;
-- #cmd[GET /version] : la même information au format JSON ;
-- #cmd[GET /healthz] : sonde utilisée par Kubernetes (readiness et liveness).
-
-La version affichée est injectée au build de l'image (#cmd[ARG APP_VERSION]) : chaque démonstration est ainsi visible directement dans le navigateur, et le nom du pod permet de constater la répartition de charge entre réplicas.
+- API #cmd[FastAPI] (Python 3.12, #cmd[uv]), libre choix laissé par le sujet.
+- #cmd[GET /] : page affichant la version déployée et le pod qui répond.
+- #cmd[GET /version] : même information en JSON.
+- #cmd[GET /healthz] : sonde readiness / liveness.
+- Version injectée au build (#cmd[ARG APP_VERSION]) : chaque déploiement est visible dans le navigateur.
 
 == Construction de l'image
 
-Le dépôt contient le code applicatif (#cmd[app/]) et une GitHub Action (#cmd[.github/workflows/build.yml]) qui, à chaque tag Git #cmd[v\*], construit l'image et la publie sur GitHub Container Registry :
+- GitHub Action (#cmd[.github/workflows/build.yml]) déclenchée par un tag Git #cmd[v\*].
+- Build puis push vers #cmd[ghcr.io/kacemmathlouthi/tp-devops:<tag>].
+- La CI n'a aucun accès au cluster : elle produit l'image, ArgoCD la déploie.
 
 ```bash
-git tag v2 && git push origin v2
-# → ghcr.io/kacemmathlouthi/tp-devops:v2
+git tag v2 && git push origin v2   # → ghcr.io/kacemmathlouthi/tp-devops:v2
 ```
-
-#info-box([Séparation CI / CD], [
-  La CI (GitHub Actions) se contente de #emph[produire] une image versionnée ; elle n'a aucun accès au cluster. Le déploiement (CD) est entièrement piloté par ArgoCD, qui #emph[tire] l'état désiré depuis Git : changer la version déployée revient à modifier le tag dans l'overlay Kustomize et à pousser le commit.
-])
 
 #shot(
   "11-ci-build-v1.png",
-  [GitHub Actions : le push du tag #cmd[v1] déclenche le workflow #cmd[build] (34 s) qui construit et publie l'image],
+  [Le push du tag #cmd[v1] déclenche le workflow #cmd[build] (34 s)],
 )
 
 == Stack technique
 
 #deflist(
   [Cluster],     [minikube (driver Docker) sous WSL 2],
-  [GitOps],      [ArgoCD (manifests officiels, namespace #cmd[argocd])],
-  [Manifests],   [Kustomize : une #cmd[base] et un overlay #cmd[dev]],
+  [GitOps],      [ArgoCD v3.5.5, namespace #cmd[argocd]],
+  [Manifests],   [Kustomize : #cmd[base] + overlay #cmd[dev]],
   [Dépôt],       [GitHub public #cmd[KacemMathlouthi/tp-devops], branche #cmd[main]],
-  [Application], [FastAPI (Python 3.12, uv), image Docker non-root],
-  [CI],          [GitHub Actions vers #cmd[ghcr.io/kacemmathlouthi/tp-devops:<tag>]],
+  [Application], [FastAPI, image Docker non-root],
+  [CI],          [GitHub Actions → GHCR],
 )
 
 == Architecture
@@ -301,31 +304,28 @@ git tag v2 && git push origin v2
 
 == Organisation
 
-Un seul dépôt contient l'ensemble du TP : code applicatif, pipeline de build et manifests. ArgoCD ne lit que le chemin #cmd[k8s/overlays/dev] ; le reste du dépôt (code, rapport, définition de l'Application) ne perturbe donc pas la synchronisation.
+- Un seul dépôt : code, CI, manifests, Application ArgoCD et rapport.
+- ArgoCD ne lit que #cmd[k8s/overlays/dev] ; le reste n'affecte pas la synchronisation.
 
 ```
 tp-devops/
-├── app/                          # code applicatif
-│   ├── main.py                   # API FastAPI
-│   ├── pyproject.toml, uv.lock   # dépendances (uv)
-│   └── Dockerfile
+├── app/                          # code applicatif + Dockerfile
 ├── .github/workflows/build.yml   # build + push de l'image sur tag vX
 ├── k8s/
-│   ├── base/                     # ressources communes
-│   │   ├── kustomization.yaml
-│   │   ├── deployment.yaml
-│   │   └── service.yaml
-│   └── overlays/
-│       └── dev/
-│           └── kustomization.yaml  # namespace, replicas, tag d'image
-├── argocd/
-│   └── application.yaml          # l'Application ArgoCD (déclarative elle aussi)
+│   ├── base/                     # Deployment, Service, kustomization
+│   └── overlays/dev/             # namespace, réplicas, tag d'image
+├── argocd/application.yaml       # l'Application ArgoCD
 └── compte-rendu/                 # ce rapport
 ```
 
 == Base Kustomize
 
-La base décrit l'application indépendamment de tout environnement : un #cmd[Deployment] et un #cmd[Service], auxquels Kustomize ajoute des labels communs.
+- Décrit l'application indépendamment de l'environnement : #cmd[Deployment] + #cmd[Service] + labels communs.
+- #cmd[readinessProbe] / #cmd[livenessProbe] sur #cmd[/healthz] : base du Health Status d'ArgoCD.
+- #cmd[POD_NAME] injecté via l'API downward.
+- Requests / limits CPU et mémoire.
+- #cmd[progressDeadlineSeconds: 60] : un rollout bloqué passe en échec en 1 min au lieu de 10.
+- Service #cmd[ClusterIP] 80 → 8000 sur le label #cmd[app: web].
 
 ```yaml
 # k8s/base/kustomization.yaml
@@ -338,18 +338,11 @@ resources:
   - service.yaml
 ```
 
-Points notables du #cmd[Deployment] :
-
-- sondes #cmd[readinessProbe] et #cmd[livenessProbe] sur #cmd[/healthz] : c'est sur elles que repose le #emph[Health Status] calculé par ArgoCD ;
-- variable #cmd[POD_NAME] injectée via l'API downward, affichée par l'application ;
-- requests/limits CPU et mémoire ;
-- #cmd[progressDeadlineSeconds: 60] : en cas d'image introuvable, Kubernetes marque le rollout en échec au bout d'une minute (au lieu de 10 par défaut) et ArgoCD affiche alors #emph[Degraded].
-
-Le #cmd[Service] (#cmd[ClusterIP], port 80 → 8000) répartit le trafic entre les pods portant le label #cmd[app: web].
-
 == Overlay #cmd[dev]
 
-L'overlay est le seul fichier modifié pendant les démonstrations : il fixe le namespace, le nombre de réplicas et le tag de l'image.
+- Seul fichier modifié pendant les démonstrations.
+- Fixe le namespace, le nombre de réplicas et le tag de l'image.
+- Rendu vérifiable sans cluster : #cmd[kubectl kustomize k8s/overlays/dev].
 
 ```yaml
 # k8s/overlays/dev/kustomization.yaml
@@ -364,15 +357,9 @@ images:
     newTag: v1
 ```
 
-Le rendu final peut être vérifié localement sans cluster :
-
-```bash
-kubectl kustomize k8s/overlays/dev
-```
-
 #shot(
   "10-github-repo.png",
-  [Dépôt public #cmd[KacemMathlouthi/tp-devops] : code applicatif, workflow CI, manifests Kustomize, Application ArgoCD et rapport ; le package GHCR #cmd[tp-devops] est lié au dépôt],
+  [Dépôt public #cmd[KacemMathlouthi/tp-devops], avec le package GHCR lié],
 )
 
 #pagebreak()
@@ -384,22 +371,23 @@ kubectl kustomize k8s/overlays/dev
 
 == Cluster Kubernetes
 
-Le cluster est un minikube mono-nœud utilisant le driver Docker, sous WSL 2. Deux vCPU et environ 4 Go de RAM suffisent pour Kubernetes, ArgoCD (7 pods) et l'application.
+- minikube mono-nœud, driver Docker, sous WSL 2.
+- 2 vCPU et ~4 Go de RAM suffisent pour Kubernetes, ArgoCD et l'application.
 
 ```bash
 minikube start --driver=docker --cpus=2 --memory=4g
 kubectl config use-context minikube
-kubectl get nodes
 ```
 
 #shot(
   "01-minikube-start.png",
-  [Démarrage du cluster minikube (Kubernetes v1.34.0, driver Docker) ; #cmd[kubectl] est configuré sur le contexte #cmd[minikube]],
+  [Démarrage du cluster (Kubernetes v1.34.0)],
 )
 
 == Installation d'ArgoCD
 
-ArgoCD est installé à partir des manifests officiels dans son propre namespace. L'option `--server-side` est nécessaire car certaines CRD dépassent la taille maximale de l'annotation #cmd[last-applied-configuration].
+- Manifests officiels dans le namespace #cmd[argocd].
+- #cmd[--server-side] requis : certaines CRD dépassent la taille de l'annotation #cmd[last-applied-configuration].
 
 ```bash
 kubectl create namespace argocd
@@ -410,48 +398,39 @@ kubectl -n argocd rollout status deploy/argocd-server
 
 #shot(
   "02-argocd-pods.png",
-  [Fin du rollout de #cmd[argocd-server] puis les 7 pods ArgoCD en état #cmd[Running] : application-controller, applicationset-controller, dex, notifications, redis, repo-server et server],
+  [Les 7 pods ArgoCD en état #cmd[Running]],
 )
 
 == Accès à l'interface
 
 ```bash
-# mot de passe initial de l'utilisateur admin
 kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d; echo
-# exposition locale de l'UI
 kubectl -n argocd port-forward svc/argocd-server 8080:443
 ```
 
 #shot(
   "03-argocd-admin-password.png",
-  [Récupération du mot de passe initial de l'utilisateur #cmd[admin] (valeur masquée)],
+  [Mot de passe initial de #cmd[admin] (masqué)],
 )
 
 #shot(
   "04-argocd-port-forward.png",
-  [Port-forward du service #cmd[argocd-server] vers #cmd[localhost:8080]],
+  [UI exposée sur #cmd[https://localhost:8080]],
 )
-
-L'interface est alors accessible sur #cmd[https://localhost:8080] (certificat auto-signé). Après connexion, ArgoCD (v3.5.5) ne gère encore aucune application.
 
 #shot(
   "05-argocd-ui-empty.png",
-  [Tableau de bord ArgoCD après la première connexion : aucune application],
+  [Première connexion : aucune application],
 )
 
 == Création de l'Application
 
-L'Application est elle-même décrite dans Git (#cmd[argocd/application.yaml]) : la configuration de l'outil GitOps suit le même principe déclaratif que l'application.
+- Décrite dans Git (#cmd[argocd/application.yaml]), comme le reste.
+- Seule commande #cmd[kubectl apply] du TP : ArgoCD crée ensuite lui-même le namespace et les ressources.
 
 ```yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: tp-gitops
-  namespace: argocd
 spec:
-  project: default
   source:
     repoURL: https://github.com/KacemMathlouthi/tp-devops.git
     targetRevision: main
@@ -467,76 +446,67 @@ spec:
       - CreateNamespace=true
 ```
 
+#deflist(
+  [automated], [synchronise dès qu'un nouveau commit est détecté],
+  [selfHeal],  [réapplique Git si le cluster dérive],
+  [prune],     [supprime du cluster ce qui est retiré de Git],
+  [Polling],   [Git interrogé toutes les 3 min ; #emph[Refresh] force une vérification],
+)
+
 ```bash
 kubectl apply -f argocd/application.yaml
-kubectl -n tp-gitops get pods -w
 ```
-
-C'est la seule commande #cmd[kubectl apply] du TP : à partir de là, ArgoCD crée lui-même le namespace #cmd[tp-gitops] et les ressources décrites dans Git. Les deux pods passent de #cmd[ContainerCreating] à #cmd[Running] puis #cmd[1/1] (readiness probe validée) en moins de 30 secondes.
 
 #shot(
   "06-app-apply-pods.png",
-  [Création de l'Application puis démarrage des deux pods #cmd[web] déployés par ArgoCD],
+  [Création de l'Application : les deux pods passent #cmd[Running 1/1] en moins de 30 s],
 )
-
-#info-box([Options de synchronisation], [
-  - #text(weight: 600)[automated] : ArgoCD synchronise dès qu'un nouveau commit est détecté, sans clic sur #emph[Sync].
-  - #text(weight: 600)[selfHeal] : si l'état du cluster s'écarte de Git (drift), ArgoCD réapplique les manifests.
-  - #text(weight: 600)[prune] : une ressource retirée de Git est supprimée du cluster.
-  - ArgoCD interroge Git toutes les 3 minutes par défaut ; le bouton #emph[Refresh] force une vérification immédiate.
-])
 
 #figure(
   image("screenshots/07-argocd-app-tile.png", width: 55%),
-  caption: [Tuile de l'application #cmd[tp-gitops] : dépôt, révision #cmd[main], chemin #cmd[k8s/overlays/dev], statut #emph[Healthy] et #emph[Synced]],
+  caption: [Application #cmd[tp-gitops] : #emph[Healthy] et #emph[Synced]],
 )
 
 #shot(
   "08-argocd-app-tree.png",
-  [Arbre des ressources : Service et Deployment #cmd[web], ReplicaSet et deux pods. Synchronisé automatiquement sur le commit #cmd[6ce6324] (#emph[Auto sync is enabled])],
+  [Arbre des ressources : Service, Deployment, ReplicaSet, 2 pods],
 )
 
-L'en-tête de la vue détaillée illustre déjà la distinction au cœur du TP : #emph[App Health] (état réel des ressources, ici #emph[Healthy]) et #emph[Sync Status] (conformité avec Git, ici #emph[Synced] sur #cmd[main]) sont deux indicateurs indépendants.
+- #emph[App Health] et #emph[Sync Status] sont affichés séparément : deux indicateurs indépendants (démo 3).
 
 ```bash
-kubectl -n tp-gitops port-forward svc/web 8081:80   # http://localhost:8081
+kubectl -n tp-gitops port-forward svc/web 8081:80
 ```
 
 #figure(
   image("screenshots/09-app-v1.png", width: 60%),
-  caption: [Application servie par le cluster : version #cmd[v1], réponse du pod #cmd[web-db7b48c65-hf4qp]],
+  caption: [Application servie par le cluster : version #cmd[v1]],
 )
 
-#pagebreak()
 
 // ═══════════════════════════════════════════
-//  4. DÉMO 1
+//  DÉMO 1
 // ═══════════════════════════════════════════
-= Démonstration 1 : déploiement continu automatisé
+#demo-page(1)
 
-Objectif : montrer qu'un simple commit suffit à modifier le cluster, sans aucune commande #cmd[kubectl].
+= Démo 1 : déploiement continu automatisé
 
-== Préparation : construction de la version v2
+*Objectif* : un commit suffit à modifier le cluster, sans commande #cmd[kubectl].
 
-La nouvelle version de l'application (refonte de la page) est publiée en poussant un tag Git. La CI produit l'image #cmd[ghcr.io/kacemmathlouthi/tp-devops:v2] mais ne touche pas au cluster : tant que Git n'y fait pas référence, rien n'est déployé.
+== Préparation : image v2
 
-```bash
-git tag v2 && git push origin v2
-```
+- Nouvelle version de la page, publiée par un tag Git.
+- La CI produit l'image mais ne déploie rien : tant que Git ne la référence pas, le cluster ne change pas.
 
 #shot(
   "12-ci-build-v2.png",
-  [GitHub Actions : le tag #cmd[v2] déclenche le build et la publication de l'image #cmd[tp-devops:v2] (32 s)],
+  [Le tag #cmd[v2] construit et publie #cmd[tp-devops:v2] (32 s)],
 )
 
-== Modification de l'état désiré dans Git
-
-Le déploiement de la nouvelle version se résume à changer une ligne dans l'overlay, puis à pousser le commit. Aucune commande n'est envoyée au cluster.
+== Changement dans Git
 
 ```diff
 # k8s/overlays/dev/kustomization.yaml
- images:
-   - name: ghcr.io/kacemmathlouthi/tp-devops
 -    newTag: v1
 +    newTag: v2
 ```
@@ -545,43 +515,44 @@ Le déploiement de la nouvelle version se résume à changer une ligne dans l'ov
 git commit -am "feat(k8s): deploy v2" && git push
 ```
 
-== Synchronisation automatique par ArgoCD
+== Synchronisation par ArgoCD
 
-ArgoCD interroge le dépôt périodiquement (toutes les 3 minutes par défaut) ; le bouton #emph[Refresh] force une vérification immédiate sans déclencher de synchronisation manuelle. Dès que le nouveau commit est détecté, la politique #cmd[automated] applique le Deployment modifié et Kubernetes effectue un rolling update.
+- Nouveau commit détecté (polling ou #emph[Refresh]), appliqué par la politique #cmd[automated].
+- Kubernetes effectue un rolling update (#cmd[maxSurge] / #cmd[maxUnavailable] à 25 %) :
+  - un pod v2 démarre ;
+  - un pod v1 n'est supprimé qu'une fois le pod v2 prêt ;
+  - jamais moins de deux pods disponibles.
 
 #shot(
   "13-demo1-argocd-progressing.png",
-  [Pendant la synchronisation : l'application est #emph[Synced] sur le nouveau commit mais #emph[Progressing]. Un nouveau ReplicaSet #cmd[web-9b677f46d] (#cmd[rev:2], image v2) démarre son premier pod (#cmd[ContainerCreating]) tandis que les deux pods v1 continuent de servir le trafic],
+  [#emph[Synced] mais #emph[Progressing] : le ReplicaSet v2 démarre son premier pod, les pods v1 servent encore],
 )
-
-Le rolling update respecte les valeurs par défaut du Deployment (#cmd[maxSurge: 25%], #cmd[maxUnavailable: 25%]) : un pod v2 est créé, et ce n'est qu'une fois sa readiness probe validée qu'un pod v1 est supprimé. La capacité ne descend jamais sous deux pods prêts.
 
 #shot(
   "14-demo1-argocd-healthy.png",
-  [Fin du rollout : #emph[Healthy] et #emph[Synced]. Les deux pods appartiennent au ReplicaSet v2 ; l'ancien ReplicaSet #cmd[web-db7b48c65] (#cmd[rev:1]) est conservé à 0 réplica comme historique Kubernetes (#cmd[revisionHistoryLimit])],
+  [#emph[Healthy] et #emph[Synced] : 2 pods v2, l'ancien ReplicaSet conservé à 0],
 )
 
-#shot(
-  "15-demo1-app-v2.png",
-  [Résultat visible côté utilisateur : la page affiche désormais la version #cmd[v2] (nouvelle interface), servie par le pod #cmd[web-9b677f46d-7jw27] du nouveau ReplicaSet],
+#figure(
+  box(stroke: 0.5pt + border, radius: 4pt, clip: true, image("screenshots/15-demo1-app-v2.png", width: 70%)),
+  caption: [La page affiche la version #cmd[v2]],
 )
 
 #success-box([
-  Un simple commit dans Git a suffi à déployer la version v2 : ArgoCD a détecté l'écart entre l'état désiré et l'état réel, puis a appliqué le changement sans aucune intervention sur le cluster. Le statut de santé est passé de #emph[Progressing] à #emph[Healthy] à la fin du rolling update, sans interruption de service.
+  - Un commit d'une ligne a déployé la v2.
+  - Aucune intervention sur le cluster, aucune interruption de service.
 ])
 
-#pagebreak()
-
 // ═══════════════════════════════════════════
-//  5. DÉMO 2
+//  DÉMO 2
 // ═══════════════════════════════════════════
-= Démonstration 2 : détection du drift et self-healing
+#demo-page(2)
 
-Objectif : altérer manuellement le cluster et montrer qu'ArgoCD rétablit l'état décrit dans Git.
+= Démo 2 : drift et self-healing
+
+*Objectif* : modifier le cluster à la main et voir ArgoCD rétablir l'état de Git.
 
 == Suppression du Deployment
-
-On simule une erreur humaine (ou une action non autorisée) en supprimant directement le Deployment depuis le terminal, sans passer par Git :
 
 ```bash
 kubectl -n tp-gitops delete deployment web
@@ -589,83 +560,76 @@ kubectl -n tp-gitops delete deployment web
 
 #shot(
   "16-demo2-delete.png",
-  [Suppression manuelle du Deployment #cmd[web] : les deux pods v2 sont supprimés en cascade],
+  [Suppression manuelle du Deployment, sans passer par Git],
 )
 
-L'état réel du cluster ne correspond plus à Git : la ressource #cmd[Deployment/web] déclarée dans l'overlay est absente. L'application-controller d'ArgoCD surveille en permanence les ressources qu'il gère (via des #emph[watches] sur l'API Kubernetes) ; il détecte immédiatement l'écart et, comme #cmd[selfHeal: true] est activé, relance une synchronisation sans attendre le prochain polling de Git.
-
-== Réconciliation automatique
+- L'application-controller surveille les ressources gérées via l'API Kubernetes (#emph[watches]).
+- L'écart est détecté immédiatement, sans attendre le polling de Git.
+- #cmd[selfHeal: true] relance aussitôt une synchronisation.
 
 #shot(
   "17-demo2-argocd-recreating.png",
-  [Quelques secondes après la suppression : ArgoCD a déjà recréé le Deployment (#cmd[a few seconds], #cmd[rev:1]) et son ReplicaSet ; les nouveaux pods démarrent (#cmd[0/1]), l'application est #emph[Progressing]],
+  [Quelques secondes après : Deployment déjà recréé, pods en démarrage (#emph[Progressing])],
 )
 
 #shot(
   "18-demo2-argocd-healed.png",
-  [Environ 15 secondes après la suppression : application de nouveau #emph[Healthy] et #emph[Synced]. Le Service, qui n'a pas été touché, garde son âge (40 minutes) ; seuls le Deployment, le ReplicaSet et les pods sont neufs],
+  [~15 s après : #emph[Healthy] et #emph[Synced]],
 )
 
-Deux détails confirment que la ressource a bien été recréée et non simplement conservée :
+- Preuves de la recréation :
+  - le Service garde son âge (40 min), le Deployment et les pods sont neufs ;
+  - le Deployment repart en #cmd[rev:1] : son historique a disparu avec lui ;
+  - nouveaux noms de pods, même hash de template (même manifeste Git).
 
-- le Deployment repart en révision #cmd[rev:1] : son historique Kubernetes (dont l'ancien ReplicaSet v1) a disparu avec lui ;
-- les pods ont de nouveaux noms (#cmd[web-9b677f46d-82cw5], #cmd[web-9b677f46d-tzdr2]) mais le même hash de template, car ils sont reconstruits à partir du même manifeste Git (image v2).
+== Drift sur un champ : réplicas
 
-== Drift sur un champ : nombre de réplicas
-
-Le drift n'est pas forcément une suppression : une simple modification d'un champ est aussi détectée. On augmente manuellement le nombre de réplicas alors que Git en déclare deux :
+```bash
+kubectl -n tp-gitops scale deploy web --replicas=5
+```
 
 #shot(
   "19-demo2-scale.png",
-  [Passage manuel du Deployment à 5 réplicas avec #cmd[kubectl scale]],
+  [Passage manuel à 5 réplicas],
 )
 
 #shot(
   "20-demo2-argocd-scale-reverted.png",
-  [Quelques secondes plus tard : ArgoCD a rétabli #cmd[replicas: 2]. Les pods créés par le scale manuel (#cmd[btccd], #cmd[xr9mz]) sont déjà en #cmd[terminating] (#cmd[0/1]) ; seuls les deux pods conformes à Git restent #cmd[running]],
+  [ArgoCD rétablit #cmd[replicas: 2] : les pods en trop sont déjà en #cmd[terminating]],
 )
 
 #shot(
   "21-demo2-pods-watch.png",
-  [#cmd[kubectl get pods -w] pendant le scale : les trois pods supplémentaires passent en #cmd[Terminating] dès leur création (âge #cmd[0s]), les deux pods d'origine ne sont jamais touchés],
+  [Les 3 pods supplémentaires passent en #cmd[Terminating] dès leur création],
 )
 
-#warn-box([
-  Les trois pods supprimés finissent en #cmd[Error] au bout d'environ 35 s au lieu de s'arrêter proprement. Le signal #cmd[SIGTERM] envoyé par Kubernetes est arrivé pendant le démarrage d'uvicorn, avant l'installation de son gestionnaire de signaux. Or uvicorn tourne en PID 1 dans le conteneur, et le noyau ignore les signaux non gérés envoyés au PID 1 : le conteneur est donc tué par #cmd[SIGKILL] à l'expiration du délai de grâce (30 s, code 137). Un pod démarré depuis plus d'une seconde s'arrête en moins d'une seconde. La correction habituelle consiste à lancer l'application derrière un mini-init (#cmd[tini]).
-])
-
-La correction est si rapide que l'application ne passe même pas visiblement par l'état #emph[OutOfSync] : #emph[Last Sync] indique simplement une nouvelle synchronisation automatique réussie quelques secondes après la modification.
+- Correction si rapide que l'état #emph[OutOfSync] n'est même pas visible.
 
 #success-box([
-  Toute modification faite hors de Git est considérée comme un drift et annulée : le Deployment supprimé a été recréé en quelques secondes, sans intervention humaine. Git reste l'unique source de vérité ; pour modifier durablement le cluster, il faut passer par un commit.
+  - Toute modification faite hors de Git est annulée en quelques secondes.
+  - Pour changer durablement le cluster, il faut passer par un commit.
 ])
 
-#pagebreak()
-
 // ═══════════════════════════════════════════
-//  6. DÉMO 3
+//  DÉMO 3
 // ═══════════════════════════════════════════
-= Démonstration 3 : Sync Status et Health Status
+#demo-page(3)
 
-Objectif : montrer qu'une application peut être parfaitement synchronisée avec Git tout en étant défaillante.
+= Démo 3 : Sync Status et Health Status
 
-== Rappel : deux indicateurs indépendants
+*Objectif* : une application peut être synchronisée avec Git tout en étant défaillante.
+
+== Deux indicateurs indépendants
 
 #deflist(
-  [Sync Status], [compare l'état #emph[déclaré] dans Git à l'état #emph[déclaré] dans le cluster (les manifests). Valeurs : #emph[Synced], #emph[OutOfSync].],
-  [Health Status], [évalue l'état #emph[opérationnel] des ressources (pods prêts, rollout terminé…). Valeurs : #emph[Healthy], #emph[Progressing], #emph[Degraded], #emph[Missing]…],
+  [Sync Status],   [manifests du cluster = manifests de Git ? #emph[Synced] / #emph[OutOfSync]],
+  [Health Status], [les ressources fonctionnent-elles ? #emph[Healthy] / #emph[Progressing] / #emph[Degraded]],
 )
 
-Un manifeste peut donc être appliqué à la lettre tout en décrivant quelque chose qui ne fonctionne pas.
-
-== Introduction d'une erreur dans Git
-
-On référence une image qui n'existe pas dans le registre :
+== Erreur introduite dans Git
 
 ```diff
 # k8s/overlays/dev/kustomization.yaml
- images:
-   - name: ghcr.io/kacemmathlouthi/tp-devops
 -    newTag: v2
 +    newTag: doesnotexist
 ```
@@ -674,123 +638,122 @@ On référence une image qui n'existe pas dans le registre :
 git commit -am "feat(k8s): deploy nonexistent image" && git push
 ```
 
-== Synced mais Progressing, puis Degraded
+== Synced, puis Degraded
 
 #shot(
   "22-demo3-argocd-progressing.png",
-  [Quelques secondes après la synchronisation : #emph[Synced] sur le commit #cmd[8a2a887] mais #emph[Progressing]. Le nouveau ReplicaSet #cmd[web-598b77b57] (#cmd[rev:2]) tente de démarrer un pod qui échoue en #cmd[errimagepull] ; les deux pods v2 restent #cmd[running]],
+  [#emph[Synced] mais #emph[Progressing] : le nouveau pod échoue en #cmd[errimagepull]],
 )
 
 #shot(
   "23-demo3-argocd-degraded.png",
-  [Après l'expiration de #cmd[progressDeadlineSeconds] (60 s) : l'application est toujours #emph[Synced] mais passe en #emph[Degraded]. Le pod en échec est en #cmd[imagepullbackoff], le Deployment porte un cœur rouge],
+  [Après 60 s : toujours #emph[Synced], mais #emph[Degraded]],
 )
 
-Le passage de #emph[Progressing] à #emph[Degraded] vient de Kubernetes, pas d'ArgoCD : au bout de 60 s sans progression, le contrôleur de Deployment pose la condition #cmd[Progressing=False] (raison #cmd[ProgressDeadlineExceeded]), qu'ArgoCD traduit en #emph[Degraded].
+- Le passage à #emph[Degraded] vient de Kubernetes : #cmd[ProgressDeadlineExceeded] après #cmd[progressDeadlineSeconds] (60 s).
 
 #shot(
   "24-demo3-pod-events.png",
-  [Événements du pod en échec dans ArgoCD : #cmd[Failed to pull image "ghcr.io/kacemmathlouthi/tp-devops:doesnotexist": manifest unknown], puis #cmd[ErrImagePull] et #cmd[ImagePullBackOff] (Kubernetes réessaie avec un délai croissant)],
+  [Événements du pod : #cmd[manifest unknown], puis #cmd[ErrImagePull] / #cmd[ImagePullBackOff]],
 )
 
 #shot(
   "25-demo3-pods-watch.png",
-  [#cmd[kubectl get pods -w] : le nouveau pod alterne entre #cmd[ErrImagePull] et #cmd[ImagePullBackOff] avec des délais croissants (2 s, 18 s, 47 s, 77 s…), tandis que les deux pods v2 restent #cmd[Running 1/1]],
+  [Nouvelles tentatives à intervalles croissants ; les deux pods v2 restent #cmd[Running]],
 )
 
-#info-box([Pas d'interruption de service], [
-  Le rolling update ne supprime un ancien pod qu'une fois le nouveau prêt. Le pod #cmd[doesnotexist] ne devenant jamais prêt, les deux pods v2 de l'ancien ReplicaSet continuent de servir le trafic : le déploiement est bloqué, mais l'application reste disponible.
-])
+- #cmd[ErrImagePull] : la tentative de pull vient d'échouer.
+- #cmd[ImagePullBackOff] : attente avant la tentative suivante (délai croissant).
+- Pas d'interruption : le pod cassé n'est jamais prêt, donc les pods v2 ne sont pas supprimés.
 
 #success-box([
-  L'application est #emph[Synced] : ArgoCD a correctement appliqué ce que Git décrit. Elle est pourtant #emph[Degraded], car ce que Git décrit est faux. La synchronisation garantit la conformité à la source de vérité, pas le bon fonctionnement ; c'est le Health Status qui révèle l'erreur applicative. Pour corriger, il faut revenir à un état stable, ce qui fait l'objet de la démonstration suivante.
+  - #emph[Synced] : ArgoCD a appliqué exactement ce que dit Git.
+  - #emph[Degraded] : ce que dit Git ne fonctionne pas.
+  - La synchronisation garantit la conformité à Git, pas le bon fonctionnement.
 ])
 
-#pagebreak()
-
 // ═══════════════════════════════════════════
-//  7. DÉMO 4
+//  DÉMO 4
 // ═══════════════════════════════════════════
-= Démonstration 4 : historique et rollback
+#demo-page(4)
 
-Objectif : revenir instantanément à une version stable depuis l'onglet #emph[History and Rollback].
+= Démo 4 : historique et rollback
 
-On part de l'état laissé par la démonstration 3 : l'application est #emph[Synced] mais #emph[Degraded] sur le commit #cmd[8a2a887] (image #cmd[doesnotexist]).
+*Objectif* : revenir à une version stable depuis #emph[History and Rollback].
+
+*Point de départ* : #emph[Synced] mais #emph[Degraded] sur #cmd[8a2a887] (image #cmd[doesnotexist]).
 
 == Désactivation de l'auto-sync
 
-ArgoCD refuse un rollback tant que la synchronisation automatique est active : sans cela, la politique #cmd[automated] réappliquerait immédiatement la révision de Git, c'est-à-dire la version cassée. On la désactive depuis #emph[Details → Sync Policy].
+- ArgoCD refuse le rollback tant que l'auto-sync est actif.
+- Sinon, il réappliquerait aussitôt la révision de Git, donc la version cassée.
 
 #figure(
   image("screenshots/26-demo4-disable-autosync.png", width: 85%),
-  caption: [Confirmation de la désactivation de la synchronisation automatique],
+  caption: [Désactivation de la synchronisation automatique],
 )
 
 #figure(
   image("screenshots/27-demo4-autosync-disabled.png", width: 45%),
-  caption: [Sync Policy passée à #emph[None] : #emph[Prune] et #emph[Self Heal] restent cochés mais n'ont plus d'effet sans auto-sync],
+  caption: [Sync Policy à #emph[None]],
 )
 
-== Historique des déploiements
+== Historique
 
-L'onglet #emph[History and Rollback] liste chaque synchronisation effectuée : révision Git, auteur, message de commit, date, durée et origine (#emph[automated sync policy] ou utilisateur). L'Application conserve les 10 dernières entrées (#cmd[revisionHistoryLimit: 10]).
+- Chaque synchronisation est enregistrée : révision, auteur, message, date, origine.
+- 10 entrées conservées (#cmd[revisionHistoryLimit]).
+- La v2 apparaît sous un message #cmd[docs(cr)] : ArgoCD enregistre la tête de branche au moment de la synchronisation.
 
 #figure(
   image("screenshots/28-demo4-history.png", width: 75%),
-  caption: [Historique avant rollback : #cmd[8a2a887] (image inexistante, active), #cmd[51974a2] (version v2) et #cmd[6ce6324] (version v1)],
+  caption: [#cmd[8a2a887] (cassée), #cmd[51974a2] (v2), #cmd[6ce6324] (v1)],
 )
-
-#warn-box([
-  La révision v2 apparaît sous le message #cmd[docs(cr): add v2 build screenshot] et non #cmd[feat(k8s): deploy v2] : les deux commits ont été poussés ensemble, et ArgoCD enregistre la tête de la branche au moment de la synchronisation. Le contenu déployé est bien celui de l'overlay avec #cmd[newTag: v2].
-])
 
 == Rollback
 
-Depuis le menu de la révision #cmd[51974a2], on choisit #emph[Rollback] :
-
 #figure(
   image("screenshots/29-demo4-rollback-dialog.png", width: 85%),
-  caption: [Confirmation du rollback de l'application #cmd[tp-gitops] vers la révision #cmd[51974a2]],
+  caption: [Rollback vers #cmd[51974a2]],
 )
 
 #shot(
   "30-demo4-healthy-outofsync.png",
-  [Quelques secondes après le rollback : #emph[Healthy] (Last Sync vers #cmd[51974a2]) mais #emph[OutOfSync] par rapport à #cmd[main], qui référence toujours l'image cassée],
+  [#emph[Healthy], mais #emph[OutOfSync] : Git référence toujours l'image cassée],
 )
 
-Le rollback est quasi instantané et ne crée même aucun pod : Kubernetes retrouve l'ancien ReplicaSet v2 (#cmd[web-9b677f46d]), dont les pods n'avaient jamais été arrêtés, et le promeut en révision #cmd[rev:3] ; le ReplicaSet défaillant est ramené à zéro.
+- Quasi instantané, aucun nouveau pod : Kubernetes réutilise l'ancien ReplicaSet v2 (#cmd[rev:3]).
+- #emph[OutOfSync] est attendu : le cluster ne correspond plus à Git.
+- Le rollback UI est une mesure d'urgence qui court-circuite la source de vérité.
 
-L'état #emph[OutOfSync] est le résultat attendu : le cluster ne correspond plus à Git. Le rollback depuis l'interface est une mesure d'urgence qui court-circuite temporairement la source de vérité.
-
-== Retour à Git comme source de vérité
-
-Pour clore l'incident, l'erreur est annulée dans Git par un #cmd[git revert], qui conserve la trace de l'erreur et de sa correction dans l'historique :
+== Retour à Git
 
 ```bash
-git revert 8a2a887       # newTag: doesnotexist → v2
+git revert 8a2a887   # newTag: doesnotexist → v2
 git push
 ```
 
 #shot(
   "31-demo4-synced-after-revert.png",
-  [Après le revert : #emph[Synced] sur #cmd[ff5e36a] et #emph[Healthy], alors que l'auto-sync est encore désactivé. Git décrit à nouveau exactement ce qui tourne, aucune synchronisation n'est nécessaire],
+  [#emph[Synced] et #emph[Healthy] sans aucune synchronisation : Git décrit de nouveau ce qui tourne],
 )
 
 #figure(
   image("screenshots/32-demo4-history-after-rollback.png", width: 75%),
-  caption: [Le rollback apparaît dans l'historique comme un nouveau déploiement de #cmd[51974a2], initié par #cmd[admin] et non par la politique automatique],
+  caption: [Le rollback apparaît dans l'historique, initié par #cmd[admin]],
 )
 
-L'auto-sync est enfin réactivé : l'application retrouve son mode de fonctionnement GitOps nominal.
-
-#figure(
-  image("screenshots/33-demo4-autosync-reenabled.png", width: 45%),
-  caption: [Sync Policy de nouveau #emph[Automated], avec #emph[Prune] et #emph[Self Heal]],
-)
-
-#figure(
-  image("screenshots/34-demo4-final-synced.png", width: 70%),
-  caption: [État final : #emph[Synced] sur le commit de revert #cmd[ff5e36a], #emph[Auto sync is enabled]],
+#grid(
+  columns: (1fr, 1.4fr),
+  column-gutter: 16pt,
+  align: horizon,
+  figure(
+    image("screenshots/33-demo4-autosync-reenabled.png", width: 100%),
+    caption: [Auto-sync réactivé],
+  ),
+  figure(
+    image("screenshots/34-demo4-final-synced.png", width: 100%),
+    caption: [État final : #emph[Synced], #emph[Auto sync is enabled]],
+  ),
 )
 
 #table(
@@ -799,14 +762,15 @@ L'auto-sync est enfin réactivé : l'application retrouve son mode de fonctionne
   inset: (x: 8pt, y: 7pt),
   align: left + top,
   table.header([], text(weight: 500)[Rollback ArgoCD (UI)], text(weight: 500)[#cmd[git revert] + push]),
-  [Délai], [immédiat], [détection du commit (polling ou Refresh)],
-  [Traçabilité], [historique ArgoCD uniquement], [historique Git, relisible et revu],
+  [Délai], [immédiat], [polling ou Refresh],
+  [Traçabilité], [historique ArgoCD], [historique Git, relisible],
   [Auto-sync], [doit être désactivé], [reste actif],
-  [Usage], [mesure d'urgence], [correction pérenne],
+  [Usage], [urgence], [correction pérenne],
 )
 
 #success-box([
-  L'historique ArgoCD a permis d'identifier la dernière version saine et d'y revenir en un clic : l'application est redevenue #emph[Healthy] en quelques secondes. Le #cmd[git revert] a ensuite réaligné Git sur le cluster, puis l'auto-sync a été réactivé. L'état final est #emph[Synced] et #emph[Healthy], avec Git de nouveau seule source de vérité.
+  - Retour à la dernière version saine en un clic, #emph[Healthy] en quelques secondes.
+  - #cmd[git revert] puis réactivation de l'auto-sync : Git redevient la seule source de vérité.
 ])
 
 #pagebreak()
@@ -816,22 +780,22 @@ L'auto-sync est enfin réactivé : l'application retrouve son mode de fonctionne
 // ═══════════════════════════════════════════
 = Conclusion
 
-Ce TP a mis en place une chaîne de déploiement continu entièrement pilotée par Git. Le code applicatif, la construction de l'image, les manifests Kubernetes et la définition de l'Application ArgoCD sont versionnés dans un même dépôt ; seule l'Application a été appliquée à la main, une fois.
+== Concepts démontrés
 
 #deflist(
-  [Single Source of Truth], [l'état désiré complet (Deployment, Service, namespace, version, réplicas) est décrit dans l'overlay Kustomize ; aucune ressource applicative n'a été créée avec #cmd[kubectl apply].],
-  [Pull-based CD], [la CI ne fait que publier des images ; c'est ArgoCD, dans le cluster, qui tire les changements de Git. Démo 1 : un commit d'une ligne a déployé la v2 par rolling update, sans interruption.],
-  [Drift & Self-Healing], [démo 2 : un Deployment supprimé a été recréé en quelques secondes, un scale manuel annulé aussitôt.],
-  [Sync vs Health], [démo 3 : une image inexistante donne une application #emph[Synced] mais #emph[Degraded] ; la synchronisation garantit la conformité à Git, pas le bon fonctionnement.],
-  [Rollback & Historique], [démo 4 : retour en un clic à la dernière révision saine, puis #cmd[git revert] pour que Git redevienne la référence.],
+  [Single Source of Truth], [tout l'état désiré est dans Git ; une seule commande #cmd[kubectl apply] (l'Application)],
+  [Pull-based CD],          [démo 1 : un commit d'une ligne déploie la v2, sans interruption],
+  [Drift et self-healing],  [démo 2 : Deployment supprimé recréé, scale manuel annulé, en quelques secondes],
+  [Sync et Health],         [démo 3 : image inexistante → #emph[Synced] mais #emph[Degraded]],
+  [Rollback et historique], [démo 4 : rollback en un clic, puis #cmd[git revert]],
 )
 
-Ces démonstrations font aussi ressortir les limites et les points d'attention de l'approche :
+== Limites et pistes
 
-- la détection repose sur le polling de Git (3 minutes par défaut) ; en production, un webhook GitHub vers ArgoCD rendrait la détection quasi immédiate ;
-- le rollback depuis l'interface entre en tension avec le principe GitOps : il impose de suspendre l'auto-sync et doit toujours être suivi d'une correction dans Git ;
-- ArgoCD ne valide pas ce qu'il déploie : une erreur dans Git est appliquée fidèlement. Des garde-fous en amont (revue de code, vérification de l'existence de l'image en CI) ou des stratégies progressives (Argo Rollouts, canary) complètent utilement le dispositif ;
-- la structure base/overlay rend l'ajout d'un environnement (par exemple #cmd[overlays/prod] et une seconde Application) peu coûteux, la promotion d'une version se résumant alors à un changement de tag dans un autre overlay.
+- Polling de Git (3 min) : un webhook GitHub rendrait la détection immédiate.
+- Le rollback UI impose de suspendre l'auto-sync et doit être suivi d'une correction dans Git.
+- ArgoCD applique fidèlement une erreur : revue de code, vérification de l'image en CI ou déploiement progressif (Argo Rollouts) en amont.
+- Base / overlay : ajouter un environnement #cmd[prod] = un overlay + une Application.
 
 #info-box([Dépôt], [
   - GitHub : #link("https://github.com/KacemMathlouthi/tp-devops")[github.com/KacemMathlouthi/tp-devops]
