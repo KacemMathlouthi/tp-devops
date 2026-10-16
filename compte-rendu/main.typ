@@ -516,6 +516,21 @@ kubectl -n tp-gitops port-forward svc/web 8081:80   # http://localhost:8081
 
 Objectif : montrer qu'un simple commit suffit à modifier le cluster, sans aucune commande #cmd[kubectl].
 
+== Préparation : construction de la version v2
+
+La nouvelle version de l'application (refonte de la page) est publiée en poussant un tag Git. La CI produit l'image #cmd[ghcr.io/kacemmathlouthi/tp-devops:v2] mais ne touche pas au cluster : tant que Git n'y fait pas référence, rien n'est déployé.
+
+```bash
+git tag v2 && git push origin v2
+```
+
+#shot(
+  "12-ci-build-v2.png",
+  [GitHub Actions : le tag #cmd[v2] déclenche le build et la publication de l'image #cmd[tp-devops:v2] (32 s)],
+)
+
+== Modification de l'état désiré dans Git
+
 #todo-shot([Commit modifiant le nombre de réplicas et la version])
 
 #todo-shot([ArgoCD détecte le nouveau commit et synchronise automatiquement])
