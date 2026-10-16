@@ -1,16 +1,16 @@
-# tp-devops — GitOps avec ArgoCD
+# tp-devops — GitOps with ArgoCD
 
-TP1 DevOps avancé : déploiement continu d'une API FastAPI sur Kubernetes, piloté par ArgoCD depuis ce dépôt.
+Advanced DevOps, TP1: continuous deployment of a FastAPI app on Kubernetes, driven by ArgoCD from this repository.
 
-| Dossier | Contenu |
+| Folder | Contents |
 |---|---|
-| `app/` | API FastAPI + Dockerfile |
-| `.github/workflows/` | build et push de l'image sur tag `v*` → `ghcr.io/kacemmathlouthi/tp-devops` |
-| `k8s/` | Kustomize : `base/` + overlay `dev/` (namespace, réplicas, tag) |
-| `argocd/` | Application ArgoCD (auto-sync, prune, self-heal) |
-| `compte-rendu/` | rapport ([PDF](compte-rendu/main.pdf)) |
+| `app/` | FastAPI app + Dockerfile |
+| `.github/workflows/` | builds and pushes the image on `v*` tags → `ghcr.io/kacemmathlouthi/tp-devops` |
+| `k8s/` | Kustomize: `base/` + `dev/` overlay (namespace, replicas, image tag) |
+| `argocd/` | ArgoCD Application (auto-sync, prune, self-heal) |
+| `compte-rendu/` | report ([PDF](compte-rendu/main.pdf), in French) |
 
-## Lancer
+## Run
 
 ```bash
 minikube start --driver=docker --cpus=2 --memory=4g
@@ -21,12 +21,12 @@ kubectl -n argocd port-forward svc/argocd-server 8080:443   # UI
 kubectl -n tp-gitops port-forward svc/web 8081:80           # app
 ```
 
-## Déployer une version
+## Deploy a new version
 
 ```bash
-git tag v3 && git push origin v3          # CI construit l'image
-# k8s/overlays/dev/kustomization.yaml : newTag: v3
-git commit -am "feat(k8s): deploy v3" && git push   # ArgoCD déploie
+git tag v3 && git push origin v3          # CI builds the image
+# k8s/overlays/dev/kustomization.yaml: newTag: v3
+git commit -am "feat(k8s): deploy v3" && git push   # ArgoCD deploys it
 ```
 
-Rapport : `cd compte-rendu && typst compile --font-path fonts main.typ`
+Report: `cd compte-rendu && typst compile --font-path fonts main.typ`
