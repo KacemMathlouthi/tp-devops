@@ -625,6 +625,15 @@ Le drift n'est pas forcément une suppression : une simple modification d'un cha
   [Quelques secondes plus tard : ArgoCD a rétabli #cmd[replicas: 2]. Les pods créés par le scale manuel (#cmd[btccd], #cmd[xr9mz]) sont déjà en #cmd[terminating] (#cmd[0/1]) ; seuls les deux pods conformes à Git restent #cmd[running]],
 )
 
+#shot(
+  "21-demo2-pods-watch.png",
+  [#cmd[kubectl get pods -w] pendant le scale : les trois pods supplémentaires passent en #cmd[Terminating] dès leur création (âge #cmd[0s]), les deux pods d'origine ne sont jamais touchés],
+)
+
+#warn-box([
+  Les trois pods supprimés finissent en #cmd[Error] au bout d'environ 35 s au lieu de s'arrêter proprement. Le signal #cmd[SIGTERM] envoyé par Kubernetes est arrivé pendant le démarrage d'uvicorn, avant l'installation de son gestionnaire de signaux. Or uvicorn tourne en PID 1 dans le conteneur, et le noyau ignore les signaux non gérés envoyés au PID 1 : le conteneur est donc tué par #cmd[SIGKILL] à l'expiration du délai de grâce (30 s, code 137). Un pod démarré depuis plus d'une seconde s'arrête en moins d'une seconde. La correction habituelle consiste à lancer l'application derrière un mini-init (#cmd[tini]).
+])
+
 La correction est si rapide que l'application ne passe même pas visiblement par l'état #emph[OutOfSync] : #emph[Last Sync] indique simplement une nouvelle synchronisation automatique réussie quelques secondes après la modification.
 
 #success-box([
